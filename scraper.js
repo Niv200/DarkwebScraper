@@ -44,6 +44,10 @@ const colors = require("colors/safe");
 						"#list > div:nth-child(2) > div > div.pre-info.pre-header > div > div.col-sm-7.text-right > a"
 					)
 					.click();
+
+				document.querySelector(
+					"#list > div:nth-child(2) > div > div.pre-info.pre-header > div > div.col-sm-7.text-right > a"
+				);
 			});
 
 			await page.waitForSelector(
