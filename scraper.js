@@ -1,6 +1,7 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
 const colors = require("colors/safe");
+const mongo = require("./test.js");
 
 (async () => {
 	const browser = await puppeteer.launch({
@@ -44,10 +45,6 @@ const colors = require("colors/safe");
 						"#list > div:nth-child(2) > div > div.pre-info.pre-header > div > div.col-sm-7.text-right > a"
 					)
 					.click();
-
-				document.querySelector(
-					"#list > div:nth-child(2) > div > div.pre-info.pre-header > div > div.col-sm-7.text-right > a"
-				);
 			});
 
 			await page.waitForSelector(
@@ -87,7 +84,8 @@ const colors = require("colors/safe");
 				} else {
 					stamp = "Anonymous";
 				}
-				return { topic, stamp, time, text };
+				let id = Math.floor(Math.random() * 100000000000000);
+				return { id, topic, stamp, time, text };
 			});
 			if (previousText != data.text) {
 				previousText = data.text;
@@ -128,4 +126,5 @@ function createNewFile(data) {
 		console.log(files.length);
 		fs.writeFileSync("posts/" + files.length + ".json", JSON.stringify(data));
 	});
+	mongo.createPost(data);
 }
