@@ -38,4 +38,9 @@ createPost = (data) => {
   });
 };
 
+// getPosts = () => {
+//   return await Post.find();
+// };
+
 exports.createPost = createPost;
+// exports.getPosts = getPosts;

@@ -1,12 +1,36 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
 const colors = require("colors/safe");
-const mongo = require("./test.js");
+const mongo = require("./database.js");
+
+/////
+var firebase = require("firebase/app");
+
+// Add the Firebase products that you want to use
+require("firebase/auth");
+require("firebase/firestore");
+
+// TODO: Replace the following with your app's Firebase project configuration
+// For Firebase JavaScript SDK v7.20.0 and later, `measurementId` is an optional field
+// Initialize Firebase
+firebase.initializeApp({
+  apiKey: "AIzaSyDR_6IUS5zqRSHyhEKs4GFzHmmRKaodOis",
+  authDomain: "darkwebscraper.firebaseapp.com",
+  projectId: "darkwebscraper",
+  storageBucket: "darkwebscraper.appspot.com",
+  messagingSenderId: "503028802234",
+  appId: "1:503028802234:web:a1012a6cb4b48e716b1883",
+  measurementId: "G-BR9QDL0XKT",
+});
+
+var db = firebase.firestore();
+/////
 
 let scanningInterval = 120;
 console.clear();
 console.log(colors.green.bold("Starting scraper..."));
-console.log(colors.green.bold("V0.1.1 by Niv"));
+console.log(colors.green.bold("Be sure to run Tor proxy in background, and link MONGO_URI in .env file!"));
+console.log(colors.green.bold("V0.2.1 by Niv"));
 const prompt = require("prompt-sync")();
 
 //Should be headless?
@@ -17,6 +41,16 @@ if (headless.toLowerCase() == "y") {
 } else {
   headless = false;
   console.log(colors.italic.bold("Showing browser..."));
+}
+
+//Should posts be saved locally as well?
+let backup = prompt(colors.cyan.bold("Posts are saved on mongoDB, should they be backed locally? (Y/N)"));
+if (backup.toLowerCase() == "y") {
+  console.log(colors.italic.bold("Backing up locally"));
+  backup = true;
+} else {
+  backup = false;
+  console.log(colors.italic.bold("Files are not backed locally."));
 }
 
 //Scanning interval
@@ -51,7 +85,7 @@ if (!isNaN(countUpdate)) {
     console.log(colors.red.bold("The minimum value is 1!"));
     console.log(colors.red.bold("An update will be given every single scrape."));
   } else {
-    console.log(colors.italic.bold("Status update will be given after " + countUpdate + " posts."));
+    console.log(colors.italic.bold("Status update will be given after " + countUpdate + " scrapes."));
   }
 } else {
   countUpdate = 30;
@@ -63,7 +97,7 @@ let timesScan = 0;
 let timesToScan = prompt(colors.cyan.bold("How many times should the website be scanned? Leave 0 for no limit "));
 if (!isNaN(timesToScan)) {
   timesScan = timesToScan;
-  if (timesToScan < 1) {
+  if (timesToScan < 1 && timesToScan !== "0") {
     console.log(colors.red.bold("Scans cant be smaller than 1!"));
     console.log(colors.red.bold("Scanning for default of 10 times."));
     timesScan = 10;
@@ -110,7 +144,6 @@ let bool = true;
   let scrapes = 0;
   let newPosts = 0;
   while (bool) {
-    console.log(timesScan);
     if (timesScan == 0) {
       console.log(colors.green.bold("Finished"));
       await browser.close();
@@ -193,9 +226,28 @@ function delay(time) {
 }
 
 function createNewFile(data) {
-  fs.readdir("posts/", (err, files) => {
-    console.log(files.length);
-    fs.writeFileSync("posts/" + files.length + ".json", JSON.stringify(data));
-  });
-  mongo.createPost(data);
+  if (backup) {
+    fs.readdir("posts/", (err, files) => {
+      fs.writeFileSync("posts/" + files.length + ".json", JSON.stringify(data));
+    });
+  }
+  // mongo.createPost(data);
+  testFirebase(data);
 }
+
+const testFirebase = (data) => {
+  db.collection("posts")
+    .add({
+      topic: data.topic,
+      text: data.text,
+      stamp: data.stamp,
+      time: data.time,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+    .then((docRef) => {
+      console.log("Document written with ID: ", docRef.id);
+    })
+    .catch((error) => {
+      console.error("Error adding document: ", error);
+    });
+};
