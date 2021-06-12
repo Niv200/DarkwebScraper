@@ -1,7 +1,8 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
 const colors = require("colors/safe");
-const mongo = require("./database.js");
+// const mongo = require("./database.js");
+const startup = require("./startup.js");
 
 /////
 var firebase = require("firebase/app");
@@ -26,98 +27,15 @@ firebase.initializeApp({
 var db = firebase.firestore();
 /////
 
-let scanningInterval = 120;
-console.clear();
-console.log(colors.green.bold("Starting scraper..."));
-console.log(colors.green.bold("Be sure to run Tor proxy in background, and link MONGO_URI in .env file!"));
-console.log(colors.green.bold("V0.2.1 by Niv"));
-const prompt = require("prompt-sync")();
-
-//Should be headless?
-let headless = prompt(colors.cyan.bold("Should Puppeteer run headless? (Y/N)"));
-if (headless.toLowerCase() == "y") {
-  console.log(colors.italic.bold("Going headless..."));
-  headless = true;
-} else {
-  headless = false;
-  console.log(colors.italic.bold("Showing browser..."));
-}
-
-//Should posts be saved locally as well?
-let backup = prompt(colors.cyan.bold("Posts are saved on mongoDB, should they be backed locally? (Y/N)"));
-if (backup.toLowerCase() == "y") {
-  console.log(colors.italic.bold("Backing up locally"));
-  backup = true;
-} else {
-  backup = false;
-  console.log(colors.italic.bold("Files are not backed locally."));
-}
-
-//Scanning interval
-const interval = prompt(colors.cyan.bold("How often do you want to wait between scans (seconds)? (minimum value - 5) "));
-if (!isNaN(interval)) {
-  if (interval < 5) {
-    console.log(colors.red.bold("Interval cannot be less than 5!"));
-    console.log(colors.red.bold("setting the default time to 120 seconds."));
-  } else {
-    scanningInterval = interval;
-    console.log(colors.italic.bold("Scanning every " + scanningInterval + " seconds."));
-  }
-} else {
-  console.log(colors.red.bold("This is not a number."));
-  console.log(colors.red.bold("setting the default time to 120 seconds."));
-}
+// let settings = { headless: false, backup: false, interval: 5, showPosts: true, statusInterval: 30, scans: 30 };
+settings = startup.promptSettings();
 
 //Should posts be displayed in console?
-let displayPost = prompt(colors.cyan.bold("Should the scraped post be shown on console? (Y/N) "));
-if (displayPost.toLowerCase() == "y") {
-  console.log(colors.italic.bold("New posts will be shown on console."));
-  displayPost = true;
-} else {
-  displayPost = false;
-  console.log(colors.italic.bold("New posts will not be shown on console."));
-}
 
-//How often should a status update be given?
-let countUpdate = prompt(colors.cyan.bold("How often do you want to receive status updates? (how many scrapes before an update appear) "));
-if (!isNaN(countUpdate)) {
-  if (countUpdate < 1) {
-    console.log(colors.red.bold("The minimum value is 1!"));
-    console.log(colors.red.bold("An update will be given every single scrape."));
-  } else {
-    console.log(colors.italic.bold("Status update will be given after " + countUpdate + " scrapes."));
-  }
-} else {
-  countUpdate = 30;
-  console.log(colors.red.bold("This is not a number."));
-  console.log(colors.red.bold("setting the default time to 30 scans for status."));
-}
-
-let timesScan = 0;
-let timesToScan = prompt(colors.cyan.bold("How many times should the website be scanned? Leave 0 for no limit "));
-if (!isNaN(timesToScan)) {
-  timesScan = timesToScan;
-  if (timesToScan < 1 && timesToScan !== "0") {
-    console.log(colors.red.bold("Scans cant be smaller than 1!"));
-    console.log(colors.red.bold("Scanning for default of 10 times."));
-    timesScan = 10;
-  } else if (timesToScan === "0") {
-    console.log(colors.italic.bold("Scanning indefinitely..."));
-    timesScan = -1;
-  } else {
-    console.log(colors.italic.bold("Scanning for " + timesToScan + " times."));
-    console.log(colors.italic.bold("The script will shutdown once done."));
-    timesScan = timesToScan;
-  }
-} else {
-  console.log(colors.red.bold("This is not a number."));
-  console.log(colors.red.bold("Scanning for default of 10 times."));
-  timesScan = 10;
-}
 let bool = true;
 (async () => {
   const browser = await puppeteer.launch({
-    headless: headless,
+    headless: settings.headless,
     ignoreHTTPSErrors: true,
     args: [
       "--disable-dev-shm-usage",
@@ -144,14 +62,14 @@ let bool = true;
   let scrapes = 0;
   let newPosts = 0;
   while (bool) {
-    if (timesScan == 0) {
+    if (settings.scans == 0) {
       console.log(colors.green.bold("Finished"));
       await browser.close();
       bool = false;
       return await browser.close();
     }
-    if (timesScan != -1 && timesScan > 0) {
-      timesScan = timesScan - 1;
+    if (settings.scans != -1 && settings.scans > 0) {
+      settings.scans = settings.scans - 1;
     }
     try {
       await page.goto("http://nzxj65x32vh2fkhk.onion/all");
@@ -161,22 +79,26 @@ let bool = true;
         document.querySelector("#list > div:nth-child(2) > div > div.pre-info.pre-header > div > div.col-sm-7.text-right > a").click();
       });
 
-      await page.waitForSelector("#show > div > div > div.well.well-sm.well-white.pre > div > ol", {
+      await page.waitForSelector("#show > div > div > div.well.well-sm.well-white.pre ", {
         visible: true,
       });
-
       let data = await page.evaluate(() => {
         let topic = document.querySelector("#show > div > div > div.pre-info.pre-header > div > div.col-sm-5 > h4").innerHTML;
+        // let items = Array.from(document.querySelectorAll("#show > div > div > div.well.well-sm.well-white.pre > div > ol > li > div"));
+        // let stamp = document.querySelector("#show > div > div > div.pre-info.pre-footer > div > div:nth-child(1)").innerHTML;
+        let stamp = document.querySelector("#show > div:nth-child(1) > div > div.pre-info.pre-footer").textContent;
+        // if(!topic || !stamp || !items){
+        //   console.log("Error reading inner html");
+        //   return undefined;
+        // }
         topic = topic.replaceAll("\t", "").replaceAll("\n", "");
-        let items = Array.from(document.querySelectorAll("#show > div > div > div.well.well-sm.well-white.pre > div > ol > li > div"));
-        let newmap = items.map((item) => item.innerHTML);
-        newmap = newmap.filter((item) => !item.includes("&nbsp"));
-        let text = newmap.join("~");
-        text = "~" + text;
-        let stamp = document
-          .querySelector("#show > div > div > div.pre-info.pre-footer > div > div:nth-child(1)")
-          .innerHTML.replaceAll("\t", "")
-          .replaceAll("\n", "");
+        // let newmap = items.map((item) => item.innerHTML);
+        // newmap = newmap.filter((item) => !item.includes("&nbsp"));
+        // let text = newmap.join("~");
+        // text = "~" + text;
+        let text = document.querySelector("#show > div:nth-child(1) > div > div.well.well-sm.well-white.pre").textContent;
+
+        stamp = stamp.replaceAll("\t", "").replaceAll("\n", "");
         let time = stamp.split(" at ")[1];
         if (stamp.includes("</a>")) {
           let newStamp = stamp.replaceAll('">', "$").replaceAll("</a>", "$").split("$")[1];
@@ -185,11 +107,16 @@ let bool = true;
           stamp = "Anonymous";
         }
         let id = Math.floor(Math.random() * 100000000000000);
+        time = time.split("Language")[0];
         return { id, topic, stamp, time, text };
       });
+      if (!data) {
+        console.log("Unable to retrieve data");
+        return;
+      }
       if (previousText != data.text) {
         previousText = data.text;
-        if (displayPost) {
+        if (settings.showPosts) {
           console.log(data);
           console.log(colors.green.bold("Scraped new post!"));
         }
@@ -200,20 +127,16 @@ let bool = true;
       }
       count++;
       scrapes++;
-      if (count >= countUpdate) {
+      if (count >= settings.statusInterval) {
         console.clear();
-        console.log("---------------------------------");
-        console.log("Status update:");
-        console.log("Scraped for total of: " + scrapes + " times");
-        console.log("Of which " + newPosts + " new post(s) were scraped.");
-        console.log("---------------------------------");
-        count = 0;
+        startup.giveUpdate(scrapes, newPosts, settings);
       }
     } catch (error) {
       console.log("An error occured.");
       console.log("Trying again...");
+      console.log(error);
     }
-    await delay(scanningInterval * 1000);
+    await delay(settings.interval * 1000);
   }
   // debugger;
   // await browser.close();
@@ -226,16 +149,16 @@ function delay(time) {
 }
 
 function createNewFile(data) {
-  if (backup) {
+  if (settings.backup) {
     fs.readdir("posts/", (err, files) => {
       fs.writeFileSync("posts/" + files.length + ".json", JSON.stringify(data));
     });
   }
   // mongo.createPost(data);
-  testFirebase(data);
+  postToFirebase(data);
 }
 
-const testFirebase = (data) => {
+const postToFirebase = (data) => {
   db.collection("posts")
     .add({
       topic: data.topic,
