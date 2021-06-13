@@ -1,36 +1,33 @@
-const fs = require("fs");
-const puppeteer = require("puppeteer");
-const colors = require("colors/safe");
-// const mongo = require("./database.js");
-const startup = require("./startup.js");
-
-/////
-var firebase = require("firebase/app");
-
-// Add the Firebase products that you want to use
+require("dotenv").config();
 require("firebase/auth");
 require("firebase/firestore");
 
-// TODO: Replace the following with your app's Firebase project configuration
-// For Firebase JavaScript SDK v7.20.0 and later, `measurementId` is an optional field
-// Initialize Firebase
+const fs = require("fs");
+const puppeteer = require("puppeteer");
+const colors = require("colors/safe");
+const startup = require("./startup.js");
+var firebase = require("firebase/app");
+
+const apiKey = process.env.APIKEY;
+const authDomain = process.env.AUTHDOMAIN;
+const projectId = process.env.PROJECTID;
+const storageBucket = process.env.STORAGEBUCKET;
+const messagingSenderId = process.env.MESSAGINGID;
+const appId = process.env.APPID;
+const measurementId = process.env.MEASUREMENTID;
+
 firebase.initializeApp({
-  apiKey: "AIzaSyDR_6IUS5zqRSHyhEKs4GFzHmmRKaodOis",
-  authDomain: "darkwebscraper.firebaseapp.com",
-  projectId: "darkwebscraper",
-  storageBucket: "darkwebscraper.appspot.com",
-  messagingSenderId: "503028802234",
-  appId: "1:503028802234:web:a1012a6cb4b48e716b1883",
-  measurementId: "G-BR9QDL0XKT",
+  apiKey: apiKey,
+  authDomain: authDomain,
+  projectId: projectId,
+  storageBucket: storageBucket,
+  messagingSenderId: messagingSenderId,
+  appId: appId,
+  measurementId: measurementId,
 });
+const db = firebase.firestore();
 
-var db = firebase.firestore();
-/////
-
-// let settings = { headless: false, backup: false, interval: 5, showPosts: true, statusInterval: 30, scans: 30 };
 settings = startup.promptSettings();
-
-//Should posts be displayed in console?
 
 let bool = true;
 (async () => {
@@ -73,29 +70,16 @@ let bool = true;
     }
     try {
       await page.goto("http://nzxj65x32vh2fkhk.onion/all");
-      // await page.goto("http://nzxj65x32vh2fkhk.onion/pawpmwnog"); anonymous
-      // await page.goto("http://nzxj65x32vh2fkhk.onion/pfrk6vj35"); by antodb
       let test = await page.evaluate(() => {
         document.querySelector("#list > div:nth-child(2) > div > div.pre-info.pre-header > div > div.col-sm-7.text-right > a").click();
       });
-
       await page.waitForSelector("#show > div > div > div.well.well-sm.well-white.pre ", {
         visible: true,
       });
       let data = await page.evaluate(() => {
         let topic = document.querySelector("#show > div > div > div.pre-info.pre-header > div > div.col-sm-5 > h4").innerHTML;
-        // let items = Array.from(document.querySelectorAll("#show > div > div > div.well.well-sm.well-white.pre > div > ol > li > div"));
-        // let stamp = document.querySelector("#show > div > div > div.pre-info.pre-footer > div > div:nth-child(1)").innerHTML;
         let stamp = document.querySelector("#show > div:nth-child(1) > div > div.pre-info.pre-footer").textContent;
-        // if(!topic || !stamp || !items){
-        //   console.log("Error reading inner html");
-        //   return undefined;
-        // }
         topic = topic.replaceAll("\t", "").replaceAll("\n", "");
-        // let newmap = items.map((item) => item.innerHTML);
-        // newmap = newmap.filter((item) => !item.includes("&nbsp"));
-        // let text = newmap.join("~");
-        // text = "~" + text;
         let text = document.querySelector("#show > div:nth-child(1) > div > div.well.well-sm.well-white.pre").textContent;
 
         stamp = stamp.replaceAll("\t", "").replaceAll("\n", "");
@@ -138,8 +122,6 @@ let bool = true;
     }
     await delay(settings.interval * 1000);
   }
-  // debugger;
-  // await browser.close();
 })();
 
 function delay(time) {
@@ -154,7 +136,6 @@ function createNewFile(data) {
       fs.writeFileSync("posts/" + files.length + ".json", JSON.stringify(data));
     });
   }
-  // mongo.createPost(data);
   postToFirebase(data);
 }
 
